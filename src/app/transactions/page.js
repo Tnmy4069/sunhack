@@ -290,7 +290,7 @@ export default function Transactions() {
               </Link>
               <button 
                 onClick={() => setShowAddModal(true)}
-                className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                className="bg-blue-600 text-white px-3 mr-15 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
               >
                 + Add Transaction
               </button>

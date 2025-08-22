@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getDocuments } from '@/lib/crudHelpers';
 import { calculateFinancialMetrics, getSpendingInsights, exportToCSV } from '@/lib/analytics';
+import GoogleTranslate from '@/components/GoogleTranslate';
 
 export default function Analytics() {
   const [transactions, setTransactions] = useState([]);
@@ -59,6 +60,19 @@ export default function Analytics() {
     loadData();
   }, []);
 
+  useEffect(() => {
+  if (window.google && window.google.translate) {
+    new window.google.translate.TranslateElement(
+      { 
+        pageLanguage: 'en', 
+        includedLanguages: 'hi,ta,te,kn,mr,gu,pa,ml,or,as' // Indian languages
+      }, 
+      'google_translate_element'
+    );
+  }
+}, [transactions]); // <- put here any state that loads dynamic content
+
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -94,8 +108,10 @@ export default function Analytics() {
     return months[parseInt(month) - 1];
   };
 
+
+  
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div id='google_translate_element' className=" google_translate_element min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Enhanced Header */}
       <header className="bg-white/70 backdrop-blur-lg border-b border-white/20 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
@@ -128,6 +144,8 @@ export default function Analytics() {
                 <span>📊</span>
                 <span className="hidden sm:inline">Export CSV</span>
               </button>
+
+              <GoogleTranslate />
             </div>
           </div>
 
@@ -155,7 +173,7 @@ export default function Analytics() {
         {/* Key Insights Banner */}
         {insights.length > 0 && (
           <div className="mb-6 sm:mb-8">
-            <div className="grid gap-3 sm:gap-4">
+            <div className="grid gap-3 sm:gap-4 " id='google_translate_element'>
               {insights.slice(0, 3).map((insight, index) => (
                 <div 
                   key={index} 
@@ -334,7 +352,7 @@ export default function Analytics() {
         )}
 
         {/* Weekly Breakdown */}
-        {metrics?.weeklyData && (activeTab === 'overview' || activeTab === 'trends') && (
+        {/* {metrics?.weeklyData && (activeTab === 'overview' || activeTab === 'trends') && (
           <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-sm border border-white/50 mb-8">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
@@ -386,10 +404,10 @@ export default function Analytics() {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </div> */}
                     
                     {/* Week number indicator */}
-                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                    {/* <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-bold">
                       {index + 1}
                     </div>
                   </div>
@@ -397,7 +415,7 @@ export default function Analytics() {
               })}
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Category Trends */}
         {metrics?.categoryTrends && (activeTab === 'categories' || activeTab === 'trends') && (

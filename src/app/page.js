@@ -357,7 +357,7 @@ export default function Dashboard() {
               </Link>
               <button 
                 onClick={fetchTransactions}
-                className="w-full sm:w-auto bg-gray-600 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg hover:bg-gray-700 transition-colors text-sm sm:text-base"
+                className="w-full sm:w-auto bg-white text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg hover:bg-gray-700 transition-colors text-sm sm:text-base"
                 title="Refresh Data"
               >
                 🔄
