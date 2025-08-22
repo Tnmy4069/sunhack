@@ -23,8 +23,48 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
-h3, input, select{
+h3, input, select {
   color: #0a0a0a;
+}
+
+/* Mobile-first responsive utilities */
+@media (max-width: 640px) {
+  .recharts-legend-wrapper {
+    font-size: 12px !important;
+  }
+  
+  .recharts-pie-label-text {
+    font-size: 10px !important;
+  }
+  
+  .recharts-default-legend {
+    font-size: 11px !important;
+  }
+}
+
+/* Ensure charts are responsive */
+.recharts-wrapper {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.recharts-surface {
+  overflow: visible !important;
+}
+
+/* Smooth scrolling for better UX */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better touch targets for mobile */
+@media (max-width: 768px) {
+  button, .btn, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }

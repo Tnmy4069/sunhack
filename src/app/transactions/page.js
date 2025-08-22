@@ -275,22 +275,22 @@ export default function Transactions() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Transactions</h1>
-              <p className="text-gray-600 mt-1">Manage your income and expenses</p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+          <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+            <div className="text-center sm:text-left">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Transactions</h1>
+              <p className="text-sm sm:text-base text-gray-600 mt-1">Manage your income and expenses</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3 justify-center sm:justify-end">
               <Link 
                 href="/" 
-                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                className="bg-gray-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm sm:text-base"
               >
                 ← Dashboard
               </Link>
               <button 
                 onClick={() => setShowAddModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
               >
                 + Add Transaction
               </button>
@@ -299,10 +299,10 @@ export default function Transactions() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Filters */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border mb-6 sm:mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
               <input
@@ -310,7 +310,7 @@ export default function Transactions() {
                 placeholder="Search transactions..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               />
             </div>
             
@@ -319,7 +319,7 @@ export default function Transactions() {
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               >
                 <option value="all">All Types</option>
                 <option value="income">Income</option>
@@ -332,7 +332,7 @@ export default function Transactions() {
               <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               >
                 <option value="all">All Categories</option>
                 {[...new Set([...categories.expense, ...categories.income])].map(cat => (
@@ -341,14 +341,14 @@ export default function Transactions() {
               </select>
             </div>
             
-            <div className="flex items-end">
+            <div className="flex items-end sm:col-span-1">
               <button 
                 onClick={() => {
                   setSearchTerm('');
                   setFilterType('all');
                   setFilterCategory('all');
                 }}
-                className="w-full px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full px-3 sm:px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Clear Filters
               </button>
@@ -358,14 +358,14 @@ export default function Transactions() {
 
         {/* Transactions List */}
         <div className="bg-white rounded-xl shadow-sm border">
-          <div className="p-6 border-b">
+          <div className="p-4 sm:p-6 border-b">
             <h3 className="text-lg font-semibold">All Transactions ({filteredTransactions.length})</h3>
           </div>
           
           <div className="divide-y">
             {filteredTransactions.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <p>No transactions found</p>
+              <div className="p-6 sm:p-8 text-center text-gray-500">
+                <p className="text-sm sm:text-base">No transactions found</p>
                 <button 
                   onClick={() => setShowAddModal(true)}
                   className="text-blue-600 hover:text-blue-700 text-sm font-medium mt-2"
@@ -377,19 +377,19 @@ export default function Transactions() {
               filteredTransactions
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
                 .map((transaction) => (
-                <div key={transaction._id} className="p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-4 h-4 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                      <div>
-                        <p className="font-medium text-gray-900">{transaction.description || 'No description'}</p>
-                        <p className="text-sm text-gray-600">{transaction.category} • {transaction.date}</p>
+                <div key={transaction._id} className="p-3 sm:p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                    <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                      <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0 ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{transaction.description || 'No description'}</p>
+                        <p className="text-xs sm:text-sm text-gray-600">{transaction.category} • {transaction.date}</p>
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className={`font-semibold text-lg ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
+                      <div className="text-left sm:text-right">
+                        <p className={`font-semibold text-base sm:text-lg ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                           {transaction.type === 'income' ? '+' : '-'}₹{transaction.amount?.toLocaleString() || 0}
                         </p>
                         <p className="text-xs text-gray-500">{transaction.currency || 'INR'}</p>
@@ -398,13 +398,13 @@ export default function Transactions() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => startEdit(transaction)}
-                          className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                          className="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 sm:px-3 sm:py-1 rounded text-xs sm:text-sm transition-colors"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleDeleteTransaction(transaction._id)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                          className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 sm:px-3 sm:py-1 rounded text-xs sm:text-sm transition-colors"
                         >
                           Delete
                         </button>
