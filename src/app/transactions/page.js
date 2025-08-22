@@ -30,6 +30,7 @@ export default function Transactions() {
     category: '',
     description: '',
     date: new Date().toISOString().split('T')[0],
+    time: new Date().toLocaleTimeString('en-GB', { hour12: false }),
     goal: {
       name: '',
       target_amount: 0,
@@ -141,6 +142,7 @@ export default function Transactions() {
           category: guessCategory(description, 'expense'),
           description: description.trim(),
           date: new Date().toISOString().split('T')[0],
+          time: new Date().toLocaleTimeString('en-GB', { hour12: false }),
           goal: { name: '', target_amount: 0, duration_months: 0 }
         };
       } else if (earnedMatch) {
@@ -152,6 +154,7 @@ export default function Transactions() {
           category: guessCategory(description, 'income'),
           description: description.trim(),
           date: new Date().toISOString().split('T')[0],
+          time: new Date().toLocaleTimeString('en-GB', { hour12: false }),
           goal: { name: '', target_amount: 0, duration_months: 0 }
         };
       }
@@ -232,6 +235,7 @@ export default function Transactions() {
       category: transaction.category || '',
       description: transaction.description || '',
       date: transaction.date || new Date().toISOString().split('T')[0],
+      time: transaction.time || new Date().toLocaleTimeString('en-GB', { hour12: false }),
       goal: transaction.goal || { name: '', target_amount: 0, duration_months: 0 }
     });
     setShowEditModal(true);
@@ -245,6 +249,7 @@ export default function Transactions() {
       category: '',
       description: '',
       date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString('en-GB', { hour12: false }),
       goal: { name: '', target_amount: 0, duration_months: 0 }
     });
     setTextInput('');
@@ -383,7 +388,10 @@ export default function Transactions() {
                       <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0 ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`}></div>
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{transaction.description || 'No description'}</p>
-                        <p className="text-xs sm:text-sm text-gray-600">{transaction.category} • {transaction.date}</p>
+                        <p className="text-xs sm:text-sm text-gray-600">
+                          {transaction.category} • {transaction.date}
+                          {transaction.time && <span> • {transaction.time}</span>}
+                        </p>
                       </div>
                     </div>
                     
@@ -540,6 +548,16 @@ export default function Transactions() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Time (Optional)</label>
+                    <input
+                      type="time"
+                      value={formData.time}
+                      onChange={(e) => setFormData({...formData, time: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -683,6 +701,16 @@ export default function Transactions() {
                     type="date"
                     value={formData.date}
                     onChange={(e) => setFormData({...formData, date: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Time (Optional)</label>
+                  <input
+                    type="time"
+                    value={formData.time}
+                    onChange={(e) => setFormData({...formData, time: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
