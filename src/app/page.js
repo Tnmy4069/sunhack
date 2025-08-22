@@ -14,6 +14,8 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [dashboardStats, setDashboardStats] = useState({
     totalIncome: 0,
     totalExpenses: 0,
@@ -22,8 +24,36 @@ export default function Dashboard() {
     monthlyBreakdown: [],
     categorySpending: [],
     recentTransactions: [],
-    goalProgress: []
+    goalProgress: [],
+    lendingBorrowing: {
+      totalLent: 0,
+      totalBorrowed: 0,
+      outstandingLent: 0,
+      outstandingBorrowed: 0,
+      outstanding: []
+    }
   });
+
+  // Lending/Borrowing form state
+  const [lbForm, setLbForm] = useState({
+    type: 'lend',
+    person: '',
+    amount: '',
+    dueDate: '',
+    note: ''
+  });
+  const [submittingLB, setSubmittingLB] = useState(false);
+
+  // Handle responsive behavior and mounting
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    setMounted(true);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const calculateDashboardStats = useCallback((data) => {
     if (!data || data.length === 0) {
@@ -35,7 +65,14 @@ export default function Dashboard() {
         monthlyBreakdown: [],
         categorySpending: [],
         recentTransactions: [],
-        goalProgress: []
+        goalProgress: [],
+        lendingBorrowing: {
+          totalLent: 0,
+          totalBorrowed: 0,
+          outstandingLent: 0,
+          outstandingBorrowed: 0,
+          outstanding: []
+        }
       });
       return;
     }
@@ -44,6 +81,32 @@ export default function Dashboard() {
     const validTransactions = data.filter(t => 
       t.type === 'income' || t.type === 'expense'
     );
+
+    // Lending/Borrowing transactions
+    const lbTransactions = data.filter(t => t.type === 'lend' || t.type === 'borrow');
+    const totalLent = lbTransactions.filter(t => t.type === 'lend').reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalBorrowed = lbTransactions.filter(t => t.type === 'borrow').reduce((sum, t) => sum + (t.amount || 0), 0);
+    
+    const outstandingLB = lbTransactions.filter(t => !t.status || t.status !== 'settled');
+    const outstandingLent = outstandingLB.filter(t => t.type === 'lend').reduce((sum, t) => sum + (t.amount || 0), 0);
+    const outstandingBorrowed = outstandingLB.filter(t => t.type === 'borrow').reduce((sum, t) => sum + (t.amount || 0), 0);
+    
+    const outstanding = outstandingLB
+      .map(t => ({
+        _id: t._id,
+        type: t.type,
+        person: t.person || t.counterparty || 'Unknown',
+        amount: t.amount || 0,
+        dueDate: t.dueDate || t.due_date || '',
+        note: t.note || '',
+        date: t.date
+      }))
+      .sort((a, b) => {
+        const dateA = new Date(a.dueDate || '2100-01-01');
+        const dateB = new Date(b.dueDate || '2100-01-01');
+        return dateA - dateB;
+      })
+      .slice(0, 10);
 
     // Calculate total income and expenses
     const income = validTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + (t.amount || 0), 0);
@@ -112,6 +175,7 @@ export default function Dashboard() {
 
     const categorySpending = Object.entries(categoryData)
       .map(([category, amount]) => ({ category, amount }))
+      .filter(item => item.amount > 0)
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 6);
 
@@ -150,7 +214,14 @@ export default function Dashboard() {
       monthlyBreakdown,
       categorySpending,
       recentTransactions,
-      goalProgress
+      goalProgress,
+      lendingBorrowing: {
+        totalLent,
+        totalBorrowed,
+        outstandingLent,
+        outstandingBorrowed,
+        outstanding
+      }
     });
   }, []);
 
@@ -173,6 +244,57 @@ export default function Dashboard() {
       setLoading(false);
     }
   }, [calculateDashboardStats]);
+
+  // Handle lending/borrowing form submission
+  const handleLBSubmit = useCallback(async (e) => {
+    e.preventDefault();
+    if (!lbForm.person || !lbForm.amount || Number(lbForm.amount) <= 0) return;
+    
+    setSubmittingLB(true);
+    try {
+      const payload = {
+        type: lbForm.type,
+        person: lbForm.person,
+        amount: Number(lbForm.amount),
+        dueDate: lbForm.dueDate || null,
+        note: lbForm.note || '',
+        status: 'outstanding',
+        date: new Date().toISOString().slice(0, 10)
+      };
+      
+      const result = await createDocument('hack', payload);
+      if (result.success) {
+        setLbForm({
+          type: lbForm.type,
+          person: '',
+          amount: '',
+          dueDate: '',
+          note: ''
+        });
+        fetchTransactions();
+      }
+    } catch (err) {
+      console.error('Error adding lending/borrowing record:', err);
+    } finally {
+      setSubmittingLB(false);
+    }
+  }, [lbForm, fetchTransactions]);
+
+  // Mark lending/borrowing as settled
+  const markLBSettled = useCallback(async (id) => {
+    if (!id) return;
+    try {
+      const result = await updateDocument('hack', id, { 
+        status: 'settled', 
+        settledAt: new Date().toISOString() 
+      });
+      if (result.success) {
+        fetchTransactions();
+      }
+    } catch (err) {
+      console.error('Error settling record:', err);
+    }
+  }, [fetchTransactions]);
 
   useEffect(() => {
     fetchTransactions();
@@ -333,45 +455,39 @@ export default function Dashboard() {
           </h3>
           {dashboardStats.totalIncome > 0 || dashboardStats.totalExpenses > 0 ? (
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={[
-                      { 
-                        name: 'Income', 
-                        value: dashboardStats.totalIncome, 
-                        color: '#10b981' 
-                      },
-                      { 
-                        name: 'Expenses', 
-                        value: dashboardStats.totalExpenses, 
-                        color: '#ef4444' 
-                      }
-                    ]}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    <Cell fill="#10b981" />
-                    <Cell fill="#ef4444" />
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value) => [`₹${value.toLocaleString()}`, '']}
-                    labelFormatter={(label) => label}
-                  />
-                  <Legend 
-                    formatter={(value, entry) => (
-                      <span style={{ color: entry.color }}>
-                        {value}: ₹{entry.payload.value.toLocaleString()}
-                      </span>
-                    )}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {mounted && (
+                <div className="w-full h-full flex justify-center">
+                  <PieChart width={400} height={300}>
+                    <Pie
+                      data={[
+                        { name: 'Income', value: dashboardStats.totalIncome },
+                        { name: 'Expenses', value: dashboardStats.totalExpenses }
+                      ].filter(item => item.value > 0)}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                    >
+                      <Cell fill="#10b981" />
+                      <Cell fill="#ef4444" />
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value, name) => [`₹${Number(value).toLocaleString()}`, name]}
+                    />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={36}
+                      formatter={(value, entry) => (
+                        <span style={{ color: entry.color }}>
+                          {value}: ₹{entry.payload.value.toLocaleString()}
+                        </span>
+                      )}
+                    />
+                  </PieChart>
+                </div>
+              )}
               
               {/* Summary stats below chart */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-200">
@@ -478,35 +594,31 @@ export default function Dashboard() {
               <div className="space-y-6">
                 {/* Pie Chart for Categories */}
                 <div className="h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={dashboardStats.categorySpending.map((category, index) => ({
-                          name: category.category,
-                          value: category.amount,
-                          color: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'][index % 6]
-                        }))}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
-                        outerRadius={60}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {dashboardStats.categorySpending.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'][index % 6]} 
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        formatter={(value) => [`₹${value.toLocaleString()}`, '']}
-                        labelFormatter={(label) => label}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {mounted && (
+                    <div className="w-full h-full flex justify-center">
+                      <PieChart width={300} height={200}>
+                        <Pie
+                          data={dashboardStats.categorySpending}
+                          dataKey="amount"
+                          nameKey="category"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={70}
+                          label={({ category, percent }) => `${category}: ${(percent * 100).toFixed(1)}%`}
+                        >
+                          {dashboardStats.categorySpending.map((entry, index) => {
+                            const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'];
+                            return (
+                              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                            );
+                          })}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value, name) => [`₹${Number(value).toLocaleString()}`, name]}
+                        />
+                      </PieChart>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Category List */}
@@ -547,6 +659,178 @@ export default function Dashboard() {
                 </Link>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Lending & Borrowing Section */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
+          <h3 className="text-xl font-semibold mb-6 flex items-center gap-2">
+            <span>🤝</span>
+            Lending & Borrowing Management
+          </h3>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Summary Cards */}
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-green-600 font-medium">Total Lent</p>
+                    <p className="text-2xl font-bold text-green-700">₹{dashboardStats.lendingBorrowing.totalLent.toLocaleString()}</p>
+                    <p className="text-xs text-green-500 mt-1">Outstanding: ₹{dashboardStats.lendingBorrowing.outstandingLent.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-green-200 p-3 rounded-full">
+                    <span className="text-green-600 text-xl">💰</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gradient-to-r from-red-50 to-red-100 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-red-600 font-medium">Total Borrowed</p>
+                    <p className="text-2xl font-bold text-red-700">₹{dashboardStats.lendingBorrowing.totalBorrowed.toLocaleString()}</p>
+                    <p className="text-xs text-red-500 mt-1">Outstanding: ₹{dashboardStats.lendingBorrowing.outstandingBorrowed.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-red-200 p-3 rounded-full">
+                    <span className="text-red-600 text-xl">💸</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-blue-600 font-medium">Net Position</p>
+                    <p className={`text-2xl font-bold ${dashboardStats.lendingBorrowing.outstandingLent >= dashboardStats.lendingBorrowing.outstandingBorrowed ? 'text-green-700' : 'text-red-700'}`}>
+                      ₹{Math.abs(dashboardStats.lendingBorrowing.outstandingLent - dashboardStats.lendingBorrowing.outstandingBorrowed).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-blue-500 mt-1">
+                      {dashboardStats.lendingBorrowing.outstandingLent >= dashboardStats.lendingBorrowing.outstandingBorrowed ? 'Net Lender' : 'Net Borrower'}
+                    </p>
+                  </div>
+                  <div className="bg-blue-200 p-3 rounded-full">
+                    <span className="text-blue-600 text-xl">⚖️</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Add New Record Form */}
+            <div className="bg-gray-50 p-6 rounded-lg">
+              <h4 className="font-semibold text-gray-800 mb-4">Add New Record</h4>
+              <form onSubmit={handleLBSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                  <select 
+                    value={lbForm.type}
+                    onChange={(e) => setLbForm(prev => ({ ...prev, type: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="lend">I Lent Money</option>
+                    <option value="borrow">I Borrowed Money</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Person</label>
+                  <input
+                    type="text"
+                    value={lbForm.person}
+                    onChange={(e) => setLbForm(prev => ({ ...prev, person: e.target.value }))}
+                    placeholder="Enter person's name"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={lbForm.amount}
+                    onChange={(e) => setLbForm(prev => ({ ...prev, amount: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Due Date (Optional)</label>
+                  <input
+                    type="date"
+                    value={lbForm.dueDate}
+                    onChange={(e) => setLbForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Note (Optional)</label>
+                  <input
+                    type="text"
+                    value={lbForm.note}
+                    onChange={(e) => setLbForm(prev => ({ ...prev, note: e.target.value }))}
+                    placeholder="Additional details..."
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <button
+                  type="submit"
+                  disabled={submittingLB || !lbForm.person || !lbForm.amount}
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  {submittingLB ? 'Adding...' : 'Add Record'}
+                </button>
+              </form>
+            </div>
+
+            {/* Outstanding Records */}
+            <div className="bg-gray-50 p-6 rounded-lg">
+              <h4 className="font-semibold text-gray-800 mb-4">Outstanding Records</h4>
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {dashboardStats.lendingBorrowing.outstanding.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="text-3xl mb-2">📋</div>
+                    <p className="text-sm">No outstanding records</p>
+                  </div>
+                ) : (
+                  dashboardStats.lendingBorrowing.outstanding.map((record) => (
+                    <div key={record._id} className="bg-white p-4 rounded-lg border border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${record.type === 'lend' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                          <div>
+                            <p className="font-medium text-gray-800">{record.person}</p>
+                            <p className="text-sm text-gray-600">
+                              {record.type === 'lend' ? 'You lent' : 'You borrowed'} ₹{record.amount.toLocaleString()}
+                            </p>
+                            {record.dueDate && (
+                              <p className="text-xs text-gray-500">
+                                Due: {new Date(record.dueDate).toLocaleDateString()}
+                              </p>
+                            )}
+                            {record.note && (
+                              <p className="text-xs text-gray-500 italic">{record.note}</p>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => markLBSettled(record._id)}
+                          className="text-xs bg-gray-800 text-white px-3 py-1 rounded-md hover:bg-gray-700 transition-colors"
+                        >
+                          Settle
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
