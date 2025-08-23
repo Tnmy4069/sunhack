@@ -22,6 +22,10 @@ export default function Transactions() {
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   
+  // New filter states
+  const [showNewOnly, setShowNewOnly] = useState(false);
+  const [lastLoadTime, setLastLoadTime] = useState(null);
+  
   // Form states
   const [formData, setFormData] = useState({
     type: 'expense',
@@ -79,6 +83,7 @@ export default function Transactions() {
       const result = await getDocuments('hack');
       if (result.success) {
         setTransactions(result.data || []);
+        setLastLoadTime(new Date()); // Track when we loaded transactions
       } else {
         setError(result.error);
       }
@@ -87,6 +92,17 @@ export default function Transactions() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Filter by creation date (last 24 hours)
+  const isNewTransaction = (transaction) => {
+    if (!transaction.date) return false;
+    
+    const transactionDate = new Date(transaction.date);
+    const now = new Date();
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    return transactionDate >= dayAgo;
   };
 
   const handleAddTransaction = async () => {
@@ -255,14 +271,15 @@ export default function Transactions() {
     setTextInput('');
   };
 
-  // Filter transactions
+  // Updated filter logic with new filter included
   const filteredTransactions = transactions.filter(transaction => {
     const matchesSearch = transaction.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          transaction.category?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'all' || transaction.type === filterType;
     const matchesCategory = filterCategory === 'all' || transaction.category === filterCategory;
+    const matchesNewFilter = !showNewOnly || isNewTransaction(transaction);
     
-    return matchesSearch && matchesType && matchesCategory;
+    return matchesSearch && matchesType && matchesCategory && matchesNewFilter;
   });
 
   if (loading) {
@@ -305,9 +322,9 @@ export default function Transactions() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
-        {/* Filters */}
+        {/* Updated Filters Section */}
         <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border mb-6 sm:mb-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
               <input
@@ -346,12 +363,29 @@ export default function Transactions() {
               </select>
             </div>
             
+            {/* New "Show New Only" filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Filter</label>
+              <div className="flex items-center h-10">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={showNewOnly}
+                    onChange={(e) => setShowNewOnly(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">New only (24h)</span>
+                </label>
+              </div>
+            </div>
+            
             <div className="flex items-end sm:col-span-1">
               <button 
                 onClick={() => {
                   setSearchTerm('');
                   setFilterType('all');
                   setFilterCategory('all');
+                  setShowNewOnly(false);
                 }}
                 className="w-full px-3 sm:px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
