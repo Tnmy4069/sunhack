@@ -1,5 +1,5 @@
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import "../globals.css";
 // import GoogleTranslate from "@/components/GoogleTranslate";
 
 const geistSans = Geist({
@@ -56,7 +56,7 @@ Chatbot.init({
       "avatarBorderRadius": 50,
       "messageBorderRadius": 16,
       "showTitle": true,
-      "title": "FinVoice",
+      "title": "FinBot",
       "titleAvatarSrc": "https://www.svgrepo.com/show/532327/robot.svg",
       "avatarSize": 20,
       "welcomeMessage": "👋 Hello! Let’s manage your finances smartly.",
@@ -121,7 +121,7 @@ Chatbot.init({
 
         {/* Google Translate Widget (visible everywhere) */}
         <div className="fixed top-9 right-9 z-50">
-          {/* <GoogleTranslate /> */}
+       
         </div>
 
 

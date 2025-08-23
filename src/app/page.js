@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import GoogleTranslate from '@/components/GoogleTranslate';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { 
   getDocuments, 
@@ -10,8 +11,81 @@ import {
   deleteDocument 
 } from '@/lib/crudHelpers';
 
+// Helper function to parse and normalize dates from various formats
+const parseDate = (dateString) => {
+  if (!dateString) return null;
+  
+  try {
+    // Handle DD/MM/YYYY format
+    if (dateString.includes('/')) {
+      const parts = dateString.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+      }
+    }
+    
+    // Handle DD-MM-YYYY format
+    if (dateString.includes('-') && dateString.split('-').length === 3) {
+      const parts = dateString.split('-');
+      // Check if it's DD-MM-YYYY (day first) or YYYY-MM-DD (year first)
+      if (parts[0].length <= 2) {
+        // DD-MM-YYYY format
+        const [day, month, year] = parts;
+        return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+      } else {
+        // YYYY-MM-DD format (already standard)
+        return new Date(dateString);
+      }
+    }
+    
+    // Fallback to direct parsing
+    return new Date(dateString);
+  } catch (error) {
+    console.warn('Error parsing date:', dateString, error);
+    return null;
+  }
+};
+
+// Helper function to get normalized month key from any date format
+const getMonthKey = (dateString) => {
+  if (!dateString) return null;
+  
+  const date = parseDate(dateString);
+  if (!date || isNaN(date.getTime())) return null;
+  
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  return `${year}-${month}`;
+};
+
+// Helper function to format date consistently for display
+const formatDisplayDate = (dateString) => {
+  if (!dateString) return 'No date';
+  
+  try {
+    const date = parseDate(dateString);
+    
+    // Check if date is valid
+    if (!date || isNaN(date.getTime())) {
+      return dateString; // Return original if can't parse
+    }
+    
+    // Format as "Aug 23, 2025"
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch (error) {
+    return dateString; // Return original if any error
+  }
+};
+
 export default function Dashboard() {
   const [transactions, setTransactions] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [budgets, setBudgets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -55,7 +129,7 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const calculateDashboardStats = useCallback((data) => {
+  const calculateDashboardStats = useCallback((data, goalsData = [], budgetsData = []) => {
     if (!data || data.length === 0) {
       setDashboardStats({
         totalIncome: 0,
@@ -118,8 +192,10 @@ export default function Dashboard() {
     const monthsSet = new Set();
     validTransactions.forEach(transaction => {
       if (transaction.date && transaction.date !== '2025-08-22') { // Exclude today's empty entries
-        const monthKey = transaction.date.slice(0, 7); // YYYY-MM
-        monthsSet.add(monthKey);
+        const monthKey = getMonthKey(transaction.date);
+        if (monthKey) {
+          monthsSet.add(monthKey);
+        }
       }
     });
 
@@ -152,8 +228,8 @@ export default function Dashboard() {
     // Fill with actual data
     validTransactions.forEach(transaction => {
       if (transaction.date && transaction.date !== '2025-08-22') {
-        const monthKey = transaction.date.slice(0, 7);
-        if (monthlyData[monthKey]) {
+        const monthKey = getMonthKey(transaction.date);
+        if (monthKey && monthlyData[monthKey]) {
           if (transaction.type === 'income') {
             monthlyData[monthKey].income += transaction.amount || 0;
           } else if (transaction.type === 'expense') {
@@ -204,7 +280,45 @@ export default function Dashboard() {
       }
     });
 
-    const goalProgress = Object.values(goalData).slice(0, 3);
+    // Goal progress from goals collection
+    const goalProgress = goalsData.slice(0, 3).map(goal => ({
+      name: goal.name,
+      target: goal.target_amount,
+      saved: goal.current_amount,
+      progress: Math.min((goal.current_amount / goal.target_amount) * 100, 100),
+      deadline: goal.deadline,
+      priority: goal.priority,
+      category: goal.category
+    }));
+
+    // Budget analysis
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    const budgetAnalysis = budgetsData.map(budget => {
+      const spent = validTransactions
+        .filter(t => {
+          if (t.type !== 'expense' || t.category !== budget.category) return false;
+          const transactionDate = parseDate(t.date);
+          if (!transactionDate) return false;
+          return transactionDate.getMonth() === currentMonth && 
+                 transactionDate.getFullYear() === currentYear;
+        })
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+      const percentage = (spent / budget.monthly_limit) * 100;
+      const status = percentage > 100 ? 'over' : percentage >= budget.alert_threshold ? 'warning' : 'good';
+
+      return {
+        category: budget.category,
+        limit: budget.monthly_limit,
+        spent,
+        remaining: Math.max(0, budget.monthly_limit - spent),
+        percentage,
+        status,
+        alert_threshold: budget.alert_threshold
+      };
+    });
 
     setDashboardStats({
       totalIncome: income,
@@ -215,6 +329,7 @@ export default function Dashboard() {
       categorySpending,
       recentTransactions,
       goalProgress,
+      budgetAnalysis,
       lendingBorrowing: {
         totalLent,
         totalBorrowed,
@@ -228,17 +343,29 @@ export default function Dashboard() {
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await getDocuments('hack');
+      const [transactionsResult, goalsResult, budgetsResult] = await Promise.all([
+        getDocuments('hack'),
+        getDocuments('goals'),
+        getDocuments('budgets')
+      ]);
       
-      if (result.success) {
-        const data = result.data || [];
+      if (transactionsResult.success) {
+        const data = transactionsResult.data || [];
         setTransactions(data);
-        calculateDashboardStats(data);
+        calculateDashboardStats(data, goalsResult.data || [], budgetsResult.data || []);
       } else {
-        setError(result.error || 'Failed to fetch data');
+        setError(transactionsResult.error || 'Failed to fetch data');
+      }
+
+      if (goalsResult.success) {
+        setGoals(goalsResult.data || []);
+      }
+
+      if (budgetsResult.success) {
+        setBudgets(budgetsResult.data || []);
       }
     } catch (err) {
-      console.error('Error fetching transactions:', err);
+      console.error('Error fetching data:', err);
       setError('Failed to connect to database');
     } finally {
       setLoading(false);
@@ -343,6 +470,7 @@ export default function Dashboard() {
               <p className="text-gray-600 mt-1 text-sm sm:text-base">Manage your finances smartly and achieve your goals</p>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+              <GoogleTranslate />
               <Link 
                 href="/analytics" 
                 className="w-full sm:w-auto bg-purple-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium text-center text-sm sm:text-base"
@@ -354,6 +482,12 @@ export default function Dashboard() {
                 className="w-full sm:w-auto bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium text-center text-sm sm:text-base"
               >
                 💳 Transactions
+              </Link>
+              <Link 
+                href="/goals" 
+                className="w-full sm:w-auto bg-green-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-green-700 transition-colors font-medium text-center text-sm sm:text-base"
+              >
+                🎯 Goals & Budgets
               </Link>
               <button 
                 onClick={fetchTransactions}
@@ -656,6 +790,137 @@ export default function Dashboard() {
                 <p className="mb-4 text-sm sm:text-base">No expense categories</p>
                 <Link href="/transactions" className="text-blue-600 hover:text-blue-700 font-medium text-sm sm:text-base">
                   Add expense transactions →
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Goals & Budgets Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-6 sm:mb-8">
+          {/* Goals Progress */}
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h3 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+                <span>🎯</span>
+                Financial Goals
+              </h3>
+              <Link 
+                href="/goals" 
+                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+              >
+                View All →
+              </Link>
+            </div>
+
+            {dashboardStats.goalProgress && dashboardStats.goalProgress.length > 0 ? (
+              <div className="space-y-4">
+                {dashboardStats.goalProgress.map((goal, index) => (
+                  <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-gray-800 truncate">{goal.name}</h4>
+                        <p className="text-xs text-gray-500 capitalize">{goal.category} • {goal.priority} priority</p>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        goal.priority === 'high' ? 'bg-red-100 text-red-800' :
+                        goal.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {goal.progress?.toFixed(1) || 0}%
+                      </span>
+                    </div>
+                    <div className="mb-2">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${Math.min(goal.progress || 0, 100)}%` }}
+                        ></div>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600 mt-1">
+                        <span>₹{goal.saved?.toLocaleString() || 0}</span>
+                        <span>₹{goal.target?.toLocaleString() || 0}</span>
+                      </div>
+                    </div>
+                    {goal.deadline && (
+                      <p className="text-xs text-gray-500">
+                        Deadline: {new Date(goal.deadline).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 sm:py-8 text-gray-500">
+                <div className="text-3xl sm:text-4xl mb-4">🎯</div>
+                <p className="mb-4 text-sm sm:text-base">No financial goals set</p>
+                <Link href="/goals" className="text-blue-600 hover:text-blue-700 font-medium text-sm sm:text-base">
+                  Create your first goal →
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Budget Overview */}
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h3 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+                <span>💰</span>
+                Budget Status
+              </h3>
+              <Link 
+                href="/goals" 
+                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+              >
+                Manage →
+              </Link>
+            </div>
+
+            {dashboardStats.budgetAnalysis && dashboardStats.budgetAnalysis.length > 0 ? (
+              <div className="space-y-4">
+                {dashboardStats.budgetAnalysis.slice(0, 3).map((budget, index) => (
+                  <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-gray-800 truncate">{budget.category}</h4>
+                        <p className="text-xs text-gray-500">Monthly limit: ₹{budget.limit?.toLocaleString()}</p>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        budget.status === 'over' ? 'bg-red-100 text-red-800' :
+                        budget.status === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {budget.status === 'over' ? 'Over Budget' :
+                         budget.status === 'warning' ? 'Near Limit' : 'On Track'}
+                      </span>
+                    </div>
+                    <div className="mb-2">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            budget.status === 'over' ? 'bg-red-500' :
+                            budget.status === 'warning' ? 'bg-yellow-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${Math.min(budget.percentage || 0, 100)}%` }}
+                        ></div>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600 mt-1">
+                        <span>Spent: ₹{budget.spent?.toLocaleString() || 0}</span>
+                        <span>{budget.percentage?.toFixed(1) || 0}%</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Remaining: ₹{budget.remaining?.toLocaleString() || 0}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 sm:py-8 text-gray-500">
+                <div className="text-3xl sm:text-4xl mb-4">💰</div>
+                <p className="mb-4 text-sm sm:text-base">No budgets set</p>
+                <Link href="/goals" className="text-blue-600 hover:text-blue-700 font-medium text-sm sm:text-base">
+                  Create your first budget →
                 </Link>
               </div>
             )}

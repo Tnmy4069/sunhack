@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import GoogleTranslate from '@/components/GoogleTranslate';
 import { 
   getDocuments, 
   createDocument, 
@@ -106,9 +107,10 @@ export default function Transactions() {
   const isNewTransaction = (transaction) => {
     if (!transaction.date) return false;
     
-    const transactionDate = new Date(transaction.date);
-    const now = new Date();
+    const transactionDate = parseDate(transaction.date);
+    if (!transactionDate) return false;
     
+    const now = new Date();
     const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     
     return transactionDate >= dayAgo;
@@ -118,7 +120,9 @@ export default function Transactions() {
   const matchesDateRange = (transaction) => {
     if (!transaction.date) return false;
     
-    const transactionDate = new Date(transaction.date);
+    const transactionDate = parseDate(transaction.date);
+    if (!transactionDate) return false;
+    
     const now = new Date();
     
     switch (dateRange) {
@@ -134,6 +138,7 @@ export default function Transactions() {
         if (customStartDate && customEndDate) {
           const startDate = new Date(customStartDate);
           const endDate = new Date(customEndDate);
+          endDate.setHours(23, 59, 59, 999); // Include the entire end date
           return transactionDate >= startDate && transactionDate <= endDate;
         }
         return true;
@@ -182,8 +187,8 @@ export default function Transactions() {
           break;
         case 'date':
         default:
-          aValue = new Date(a.date || 0);
-          bValue = new Date(b.date || 0);
+          aValue = parseDate(a.date) || new Date(0);
+          bValue = parseDate(b.date) || new Date(0);
           break;
       }
       
@@ -340,36 +345,58 @@ export default function Transactions() {
       currency: transaction.currency || 'INR',
       category: transaction.category || '',
       description: transaction.description || '',
-      date: transaction.date || new Date().toISOString().split('T')[0],
+      date: formatDateForInput(transaction.date) || new Date().toISOString().split('T')[0],
       time: transaction.time || new Date().toLocaleTimeString('en-GB', { hour12: false }),
       goal: transaction.goal || { name: '', target_amount: 0, duration_months: 0 }
     });
     setShowEditModal(true);
   };
 
-  // Helper function to format date consistently
+  // Helper function to parse and normalize dates from various formats
+  const parseDate = (dateString) => {
+    if (!dateString) return null;
+    
+    try {
+      // Handle DD/MM/YYYY format
+      if (dateString.includes('/')) {
+        const parts = dateString.split('/');
+        if (parts.length === 3) {
+          const [day, month, year] = parts;
+          return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+        }
+      }
+      
+      // Handle DD-MM-YYYY format
+      if (dateString.includes('-') && dateString.split('-').length === 3) {
+        const parts = dateString.split('-');
+        // Check if it's DD-MM-YYYY (day first) or YYYY-MM-DD (year first)
+        if (parts[0].length <= 2) {
+          // DD-MM-YYYY format
+          const [day, month, year] = parts;
+          return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+        } else {
+          // YYYY-MM-DD format (already standard)
+          return new Date(dateString);
+        }
+      }
+      
+      // Fallback to direct parsing
+      return new Date(dateString);
+    } catch (error) {
+      console.warn('Error parsing date:', dateString, error);
+      return null;
+    }
+  };
+
+  // Helper function to format date consistently for display
   const formatDate = (dateString) => {
     if (!dateString) return 'No date';
     
     try {
-      // Handle different date formats
-      let date;
-      
-      // Check if it's DD/MM/YYYY format
-      if (dateString.includes('/')) {
-        const parts = dateString.split('/');
-        if (parts.length === 3) {
-          // Convert DD/MM/YYYY to YYYY-MM-DD
-          const [day, month, year] = parts;
-          date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
-        }
-      } else {
-        // Assume it's YYYY-MM-DD or other standard format
-        date = new Date(dateString);
-      }
+      const date = parseDate(dateString);
       
       // Check if date is valid
-      if (isNaN(date.getTime())) {
+      if (!date || isNaN(date.getTime())) {
         return dateString; // Return original if can't parse
       }
       
@@ -381,6 +408,22 @@ export default function Transactions() {
       });
     } catch (error) {
       return dateString; // Return original if any error
+    }
+  };
+
+  // Helper function to convert date to YYYY-MM-DD format for form inputs
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    
+    try {
+      const date = parseDate(dateString);
+      if (!date || isNaN(date.getTime())) {
+        return '';
+      }
+      
+      return date.toISOString().split('T')[0];
+    } catch (error) {
+      return '';
     }
   };
 
@@ -435,16 +478,23 @@ export default function Transactions() {
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Transactions</h1>
               <p className="text-sm sm:text-base text-gray-600 mt-1">Manage your income and expenses</p>
             </div>
-            <div className="flex gap-2 sm:gap-3 justify-center sm:justify-end">
+            <div className="flex gap-2 sm:gap-3 justify-center sm:justify-end items-center">
+              <GoogleTranslate />
               <Link 
                 href="/" 
                 className="bg-gray-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm sm:text-base"
               >
                 ← Dashboard
               </Link>
+              <Link 
+                href="/goals" 
+                className="bg-green-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-green-700 transition-colors text-sm sm:text-base"
+              >
+                🎯 Goals
+              </Link>
               <button 
                 onClick={() => setShowAddModal(true)}
-                className="bg-blue-600 text-white px-3 mr-15 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
               >
                 + Add Transaction
               </button>

@@ -8,6 +8,8 @@ import GoogleTranslate from '@/components/GoogleTranslate';
 
 export default function Analytics() {
   const [transactions, setTransactions] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [budgets, setBudgets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null); // ✅ Add error state
   const [metrics, setMetrics] = useState(null);
@@ -37,16 +39,28 @@ export default function Analytics() {
 
   const loadData = async () => {
     setLoading(true);
-    setError(null); // reset error before reload
     try {
-      const result = await getDocuments('hack');
-      if (result.success) {
-        const data = result.data || [];
+      const [transactionsResult, goalsResult, budgetsResult] = await Promise.all([
+        getDocuments('hack'),
+        getDocuments('goals'),
+        getDocuments('budgets')
+      ]);
+      
+      if (transactionsResult.success) {
+        const data = transactionsResult.data || [];
         setTransactions(data);
         setMetrics(calculateFinancialMetrics(data));
         setInsights(getSpendingInsights(data));
       } else {
         setError('Failed to fetch documents');
+      }
+
+      if (goalsResult.success) {
+        setGoals(goalsResult.data || []);
+      }
+
+      if (budgetsResult.success) {
+        setBudgets(budgetsResult.data || []);
       }
     } catch (err) {
       console.error('Error loading data:', err);
@@ -136,10 +150,18 @@ export default function Analytics() {
                 <span className="group-hover:-translate-x-1 transition-transform duration-200">←</span>
                 <span className="hidden sm:inline">Dashboard</span>
               </Link>
+
+              <Link 
+                href="/goals" 
+                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-3 py-2 sm:px-6 sm:py-3 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center gap-2"
+              >
+                <span>🎯</span>
+                <span className="hidden sm:inline">Goals</span>
+              </Link>
               
               <button 
                 onClick={handleExportCSV}
-                className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white px-3 py-2 sm:px-6 sm:py-3 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center gap-2"
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-3 py-2 sm:px-6 sm:py-3 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center gap-2"
               >
                 <span>📊</span>
                 <span className="hidden sm:inline">Export CSV</span>
