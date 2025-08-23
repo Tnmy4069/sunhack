@@ -25,6 +25,14 @@ export default function Transactions() {
   // New filter states
   const [showNewOnly, setShowNewOnly] = useState(false);
   const [lastLoadTime, setLastLoadTime] = useState(null);
+  const [dateRange, setDateRange] = useState('all'); // 'all', 'today', 'week', 'month', 'custom'
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [amountRange, setAmountRange] = useState('all'); // 'all', 'small', 'medium', 'large', 'custom'
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+  const [sortBy, setSortBy] = useState('date'); // 'date', 'amount', 'category', 'type'
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc', 'desc'
   
   // Form states
   const [formData, setFormData] = useState({
@@ -93,16 +101,98 @@ export default function Transactions() {
       setLoading(false);
     }
   };
-
+ 
   // Filter by creation date (last 24 hours)
   const isNewTransaction = (transaction) => {
     if (!transaction.date) return false;
     
     const transactionDate = new Date(transaction.date);
     const now = new Date();
+    
     const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     
     return transactionDate >= dayAgo;
+  };
+
+  // Filter by date range
+  const matchesDateRange = (transaction) => {
+    if (!transaction.date) return false;
+    
+    const transactionDate = new Date(transaction.date);
+    const now = new Date();
+    
+    switch (dateRange) {
+      case 'today':
+        return transactionDate.toDateString() === now.toDateString();
+      case 'week':
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return transactionDate >= weekAgo;
+      case 'month':
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        return transactionDate >= monthAgo;
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          const startDate = new Date(customStartDate);
+          const endDate = new Date(customEndDate);
+          return transactionDate >= startDate && transactionDate <= endDate;
+        }
+        return true;
+      default:
+        return true;
+    }
+  };
+
+  // Filter by amount range
+  const matchesAmountRange = (transaction) => {
+    const amount = transaction.amount || 0;
+    
+    switch (amountRange) {
+      case 'small':
+        return amount <= 1000;
+      case 'medium':
+        return amount > 1000 && amount <= 10000;
+      case 'large':
+        return amount > 10000;
+      case 'custom':
+        const min = parseFloat(minAmount) || 0;
+        const max = parseFloat(maxAmount) || Infinity;
+        return amount >= min && amount <= max;
+      default:
+        return true;
+    }
+  };
+
+  // Sort transactions
+  const sortTransactions = (transactions) => {
+    return transactions.sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortBy) {
+        case 'amount':
+          aValue = a.amount || 0;
+          bValue = b.amount || 0;
+          break;
+        case 'category':
+          aValue = (a.category || '').toLowerCase();
+          bValue = (b.category || '').toLowerCase();
+          break;
+        case 'type':
+          aValue = a.type || '';
+          bValue = b.type || '';
+          break;
+        case 'date':
+        default:
+          aValue = new Date(a.date || 0);
+          bValue = new Date(b.date || 0);
+          break;
+      }
+      
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+      }
+    });
   };
 
   const handleAddTransaction = async () => {
@@ -257,6 +347,43 @@ export default function Transactions() {
     setShowEditModal(true);
   };
 
+  // Helper function to format date consistently
+  const formatDate = (dateString) => {
+    if (!dateString) return 'No date';
+    
+    try {
+      // Handle different date formats
+      let date;
+      
+      // Check if it's DD/MM/YYYY format
+      if (dateString.includes('/')) {
+        const parts = dateString.split('/');
+        if (parts.length === 3) {
+          // Convert DD/MM/YYYY to YYYY-MM-DD
+          const [day, month, year] = parts;
+          date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+        }
+      } else {
+        // Assume it's YYYY-MM-DD or other standard format
+        date = new Date(dateString);
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return dateString; // Return original if can't parse
+      }
+      
+      // Format as "Aug 23, 2025"
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return dateString; // Return original if any error
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       type: 'expense',
@@ -271,16 +398,21 @@ export default function Transactions() {
     setTextInput('');
   };
 
-  // Updated filter logic with new filter included
+  // Updated filter logic with all new filters included
   const filteredTransactions = transactions.filter(transaction => {
     const matchesSearch = transaction.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          transaction.category?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'all' || transaction.type === filterType;
     const matchesCategory = filterCategory === 'all' || transaction.category === filterCategory;
     const matchesNewFilter = !showNewOnly || isNewTransaction(transaction);
+    const matchesDateFilter = matchesDateRange(transaction);
+    const matchesAmountFilter = matchesAmountRange(transaction);
     
-    return matchesSearch && matchesType && matchesCategory && matchesNewFilter;
+    return matchesSearch && matchesType && matchesCategory && matchesNewFilter && matchesDateFilter && matchesAmountFilter;
   });
+
+  // Apply sorting to filtered transactions
+  const sortedAndFilteredTransactions = sortTransactions([...filteredTransactions]);
 
   if (loading) {
     return (
@@ -324,7 +456,8 @@ export default function Transactions() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Updated Filters Section */}
         <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border mb-6 sm:mb-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+          {/* First Row of Filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
               <input
@@ -362,10 +495,122 @@ export default function Transactions() {
                 ))}
               </select>
             </div>
-            
-            {/* New "Show New Only" filter */}
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Filter</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+              <select
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="all">All Dates</option>
+                <option value="today">Today</option>
+                <option value="week">Last Week</option>
+                <option value="month">Last Month</option>
+                <option value="custom">Custom Range</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Amount Range</label>
+              <select
+                value={amountRange}
+                onChange={(e) => setAmountRange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="all">All Amounts</option>
+                <option value="small">Small (≤₹1,000)</option>
+                <option value="medium">Medium (₹1,001-₹10,000)</option>
+                <option value="large">Large (&gt;₹10,000)</option>
+                <option value="custom">Custom Range</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Second Row - Conditional Filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
+            {/* Custom Date Range */}
+            {dateRange === 'custom' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Custom Amount Range */}
+            {amountRange === 'custom' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Min Amount (₹)</label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={minAmount}
+                    onChange={(e) => setMinAmount(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Max Amount (₹)</label>
+                  <input
+                    type="number"
+                    placeholder="∞"
+                    value={maxAmount}
+                    onChange={(e) => setMaxAmount(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Third Row - Sort and Additional Options */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="date">Date</option>
+                <option value="amount">Amount</option>
+                <option value="category">Category</option>
+                <option value="type">Type</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Sort Order</label>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="desc">Descending (Latest First)</option>
+                <option value="asc">Ascending (Oldest First)</option>
+              </select>
+            </div>
+            
+            {/* Show New Only filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Special Filters</label>
               <div className="flex items-center h-10">
                 <label className="flex items-center">
                   <input
@@ -379,18 +624,68 @@ export default function Transactions() {
               </div>
             </div>
             
-            <div className="flex items-end sm:col-span-1">
+            <div className="flex items-end">
               <button 
                 onClick={() => {
                   setSearchTerm('');
                   setFilterType('all');
                   setFilterCategory('all');
                   setShowNewOnly(false);
+                  setDateRange('all');
+                  setAmountRange('all');
+                  setCustomStartDate('');
+                  setCustomEndDate('');
+                  setMinAmount('');
+                  setMaxAmount('');
+                  setSortBy('date');
+                  setSortOrder('desc');
                 }}
                 className="w-full px-3 sm:px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                Clear Filters
+                Clear All Filters
               </button>
+            </div>
+          </div>
+
+          {/* Filter Summary */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-gray-600">Active filters:</span>
+              {searchTerm && (
+                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                  Search: &quot;{searchTerm}&quot;
+                </span>
+              )}
+              {filterType !== 'all' && (
+                <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                  Type: {filterType}
+                </span>
+              )}
+              {filterCategory !== 'all' && (
+                <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
+                  Category: {filterCategory}
+                </span>
+              )}
+              {dateRange !== 'all' && (
+                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                  Date: {dateRange}
+                </span>
+              )}
+              {amountRange !== 'all' && (
+                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                  Amount: {amountRange}
+                </span>
+              )}
+              {showNewOnly && (
+                <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full">
+                  New only
+                </span>
+              )}
+              {(sortBy !== 'date' || sortOrder !== 'desc') && (
+                <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full">
+                  Sort: {sortBy} ({sortOrder})
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -398,11 +693,11 @@ export default function Transactions() {
         {/* Transactions List */}
         <div className="bg-white rounded-xl shadow-sm border">
           <div className="p-4 sm:p-6 border-b">
-            <h3 className="text-lg font-semibold">All Transactions ({filteredTransactions.length})</h3>
+            <h3 className="text-lg font-semibold">All Transactions ({sortedAndFilteredTransactions.length})</h3>
           </div>
           
           <div className="divide-y">
-            {filteredTransactions.length === 0 ? (
+            {sortedAndFilteredTransactions.length === 0 ? (
               <div className="p-6 sm:p-8 text-center text-gray-500">
                 <p className="text-sm sm:text-base">No transactions found</p>
                 <button 
@@ -413,9 +708,7 @@ export default function Transactions() {
                 </button>
               </div>
             ) : (
-              filteredTransactions
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .map((transaction) => (
+              sortedAndFilteredTransactions.map((transaction) => (
                 <div key={transaction._id} className="p-3 sm:p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                     <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
@@ -423,7 +716,7 @@ export default function Transactions() {
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{transaction.description || 'No description'}</p>
                         <p className="text-xs sm:text-sm text-gray-600">
-                          {transaction.category} • {transaction.date}
+                          {transaction.category} • {formatDate(transaction.date)}
                           {transaction.time && <span> • {transaction.time}</span>}
                         </p>
                       </div>
