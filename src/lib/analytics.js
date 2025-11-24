@@ -244,7 +244,7 @@ export const exportToCSV = (transactions) => {
   
   const csvContent = [headers, ...rows]
     .map(row => row.map(cell => `"${cell}"`).join(','))
-    .join('\\n');
+    .join('\n');
   
   const blob = new Blob([csvContent], { type: 'text/csv' });
   const url = window.URL.createObjectURL(blob);

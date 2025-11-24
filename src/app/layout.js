@@ -25,8 +25,9 @@ export default function RootLayout({ children }) {
           __html: `
         import Chatbot from "https://cdn.n8nchatui.com/v1/embed.js";
 
+
 Chatbot.init({
-  "n8nChatUrl": "https://cipherxxx7.app.n8n.cloud/webhook/8a5da32d-5561-4ef4-80d7-d0bb0f51eac3/chat",
+  "n8nChatUrl": "https://hitera9576.app.n8n.cloud/webhook/2240918d-0200-4e07-ba6a-8c8e623e2c45/chat",
   "metadata": {},
   "theme": {
     "button": {
