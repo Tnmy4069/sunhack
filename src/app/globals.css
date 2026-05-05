@@ -1,87 +1,136 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f0f4f8;
+  --foreground: #1e293b;
+  --primary: #5a45ff;
+  --sidebar-width: 260px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-primary: var(--primary);
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(135deg, #eef2f7 0%, #f4f7fc 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
   margin: 0;
   padding: 0;
+  min-height: 100vh;
 }
 
-h3, input, select, textarea {
-  color: #0a0a0a;
+/* Premium Card Styles */
+.lumina-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 1.5rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
 }
 
-/* Mobile-first responsive utilities */
-@media (max-width: 640px) {
-  .recharts-legend-wrapper {
-    font-size: 12px !important;
-  }
-  
-  .recharts-pie-label-text {
-    font-size: 10px !important;
-  }
-  
-  .recharts-default-legend {
-    font-size: 11px !important;
-  }
+.lumina-card:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.06), 0 10px 10px -10px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
 }
 
-/* Ensure charts are responsive */
-.recharts-wrapper {
-  width: 100% !important;
-  height: 100% !important;
+/* Sidebar Styles */
+.lumina-sidebar {
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
 }
 
-.recharts-surface {
-  overflow: visible !important;
+.sidebar-item {
+  display: flex;
+  items-center: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: #64748b;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
-/* Smooth scrolling for better UX */
-html {
-  scroll-behavior: smooth;
+.sidebar-item:hover {
+  background: #f8fafc;
+  color: #5a45ff;
 }
 
-/* Better touch targets for mobile */
-@media (max-width: 768px) {
-  button, .btn, [role="button"] {
-    min-height: 44px;
-    min-width: 44px;
-  }
+.sidebar-item.active {
+  background: #f1f0ff;
+  color: #5a45ff;
+  box-shadow: inset 0 0 0 1px rgba(90, 69, 255, 0.1);
 }
 
-/* Hide Google Translate top bar */
-.goog-te-banner-frame.skiptranslate {
-  display: none !important;
-}
-body {
-  top: 0px !important;
+/* Progress Bar Styles */
+.progress-bar-container {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
 }
 
-/* Hide "Powered by Google" text */
-.goog-logo-link {
-  display: none !important;
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 4px;
 }
-.goog-te-gadget {
-  font-size: 0 !important;
+
+/* Table Styles */
+.lumina-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 12px;
 }
-/* Hide Google Translate dropdown */
+
+.lumina-table tr {
+  background: #ffffff;
+  border-radius: 12px;
+}
+
+.lumina-table td {
+  padding: 16px;
+  background: #ffffff;
+}
+
+.lumina-table td:first-child {
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+
+.lumina-table td:last-child {
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+/* Chart Customization */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: #f1f5f9;
+}
+
+.recharts-text {
+  fill: #94a3b8;
+  font-size: 12px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
